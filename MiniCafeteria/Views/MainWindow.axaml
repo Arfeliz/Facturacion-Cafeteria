@@ -1,0 +1,98 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MiniCafeteria.ViewModels"
+        x:Class="MiniCafeteria.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Cafetería POS" Background="#2c3e50">
+
+    <Grid ColumnDefinitions="*, 350">
+        <ScrollViewer Grid.Column="0" Padding="20">
+            <StackPanel>
+                <TextBlock Text="Menú de Cafetería" FontSize="28" Foreground="White" 
+                           FontWeight="Heavy" Margin="0,0,0,30"/>
+                
+                <UniformGrid Columns="3">
+                    <Button Command="{Binding AgregarPrecioCommand}" CommandParameter="50"
+                            Background="#3498db" Height="120" Margin="10" CornerRadius="12">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="☕" FontSize="30" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Café Negro" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="$50.00" FontSize="12" Opacity="0.8" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding AgregarPrecioCommand}" CommandParameter="45"
+                            Background="#e67e22" Height="120" Margin="10" CornerRadius="12">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="🥐" FontSize="30" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Empanada" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="$45.00" FontSize="12" Opacity="0.8" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding AgregarPrecioCommand}" CommandParameter="60"
+                            Background="#2ecc71" Height="120" Margin="10" CornerRadius="12">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="🥤" FontSize="30" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Jugo Natural" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="$60.00" FontSize="12" Opacity="0.8" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Column="1" Background="White" CornerRadius="20,0,0,20" Margin="10,10,0,10">
+            <Grid RowDefinitions="Auto, *, Auto" Margin="25">
+                
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="DETALLE DE COBRO" LetterSpacing="2" FontSize="12" 
+                               FontWeight="Bold" Foreground="#95a5a6"/>
+                    <Separator Margin="0,15"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="20">
+                    <StackPanel>
+                        <TextBlock Text="Total a Pagar" HorizontalAlignment="Center" Foreground="#7f8c8d"/>
+                        <TextBlock Text="{Binding TotalVentaActual, StringFormat='${0:N2}'}" 
+                                   FontSize="48" FontWeight="Black" HorizontalAlignment="Center" 
+                                   Foreground="#2c3e50"/>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <TextBlock Text="Efectivo Recibido:" FontWeight="Bold" Margin="0,0,0,5" Foreground="#34495e"/>
+                        <TextBox Text="{Binding MontoRecibido}" 
+                                 FontSize="24" 
+                                 Height="50"
+                                 HorizontalContentAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 Watermark="0.00"
+                                 Background="#ecf0f1"/>
+                    </StackPanel>
+
+                    <Border Background="#f1c40f" CornerRadius="12" Padding="15">
+                        <StackPanel>
+                            <TextBlock Text="CAMBIO PARA EL CLIENTE" FontSize="11" FontWeight="Bold" 
+                                       HorizontalAlignment="Center" Foreground="#7f8c8d"/>
+                            <TextBlock Text="{Binding Cambio, StringFormat='${0:N2}'}" 
+                                       FontSize="36" FontWeight="Bold" HorizontalAlignment="Center" 
+                                       Foreground="#2c3e50"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Spacing="10">
+                    <Button Content="FINALIZAR VENTA" Command="{Binding FinalizarVentaCommand}"
+                            Background="#27ae60" Foreground="White" Height="60"
+                            FontSize="18" FontWeight="Bold" CornerRadius="8"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    
+                    <Button Content="Corte de Caja (Reporte)" Command="{Binding GenerarReporteCommand}"
+                            Background="#8e44ad" Foreground="White" Height="45"
+                            CornerRadius="8" HorizontalAlignment="Stretch" 
+                            HorizontalContentAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
