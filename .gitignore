@@ -22,6 +22,10 @@ ARM64/
 # Logs
 *.log
 
+# Local tool/cache folders
+.dotnet/
+.localappdata/
+
 # NuGet
 *.nupkg
 **/[Pp]ackages/*

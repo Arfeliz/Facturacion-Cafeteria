@@ -1,0 +1,15 @@
+﻿[
+  { "Nombre": "Cafe Negro", "Precio": 50, "Categoria": "Bebidas", "ColorFondo": "#2d9cdb", "ColorBorde": "#1d7fb6" },
+  { "Nombre": "Cafe con Leche", "Precio": 65, "Categoria": "Bebidas", "ColorFondo": "#2f80ed", "ColorBorde": "#2567c0" },
+  { "Nombre": "Capuccino", "Precio": 85, "Categoria": "Bebidas", "ColorFondo": "#3f6ad8", "ColorBorde": "#3458b3" },
+  { "Nombre": "Chocolate Caliente", "Precio": 80, "Categoria": "Bebidas", "ColorFondo": "#8e44ad", "ColorBorde": "#74388f" },
+  { "Nombre": "Te de Jengibre", "Precio": 55, "Categoria": "Bebidas", "ColorFondo": "#16a085", "ColorBorde": "#117e69" },
+  { "Nombre": "Jugo de Chinola", "Precio": 75, "Categoria": "Bebidas", "ColorFondo": "#27ae60", "ColorBorde": "#1f8d4d" },
+  { "Nombre": "Morir Sonando", "Precio": 95, "Categoria": "Bebidas", "ColorFondo": "#2ecc71", "ColorBorde": "#27a85d" },
+  { "Nombre": "Empanada de Pollo", "Precio": 60, "Categoria": "Comidas", "ColorFondo": "#e67e22", "ColorBorde": "#bb661b" },
+  { "Nombre": "Empanada de Queso", "Precio": 55, "Categoria": "Comidas", "ColorFondo": "#d35400", "ColorBorde": "#aa4300" },
+  { "Nombre": "Quipe", "Precio": 40, "Categoria": "Comidas", "ColorFondo": "#f39c12", "ColorBorde": "#c67f0f" },
+  { "Nombre": "Pastelito de Queso", "Precio": 45, "Categoria": "Comidas", "ColorFondo": "#c0392b", "ColorBorde": "#9b2e23" },
+  { "Nombre": "Pan con Jamon y Queso", "Precio": 70, "Categoria": "Comidas", "ColorFondo": "#7f8c8d", "ColorBorde": "#657274" },
+  { "Nombre": "Yaniqueque", "Precio": 35, "Categoria": "Comidas", "ColorFondo": "#95a5a6", "ColorBorde": "#768485" }
+]
