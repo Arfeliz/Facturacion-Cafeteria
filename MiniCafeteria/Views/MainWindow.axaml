@@ -4,165 +4,207 @@
         x:Class="MiniCafeteria.Views.MainWindow"
         x:Name="RootWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="Cafeteria POS v2.0" Background="#2c3e50">
+        Title="Cafeteria POS"
+        Background="{Binding FondoVentana}">
 
     <Window.Styles>
+        <Style Selector="Button.toolButton">
+            <Setter Property="Foreground" Value="#e8edf3"/>
+            <Setter Property="Background" Value="#222b3c"/>
+            <Setter Property="BorderBrush" Value="#41506a"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="MinHeight" Value="32"/>
+        </Style>
+
         <Style Selector="Button.menuItem">
-            <Setter Property="Height" Value="82"/>
+            <Setter Property="Width" Value="170"/>
+            <Setter Property="Height" Value="66"/>
             <Setter Property="Margin" Value="4"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Foreground" Value="#e8edf3"/>
+            <Setter Property="Background" Value="#222b3c"/>
+            <Setter Property="BorderBrush" Value="#41506a"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="*, 360">
-        <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="20">
-            <Border Grid.Row="0" Background="#32465a" CornerRadius="14" Padding="14">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="MENU DOMINICANO" FontSize="24" FontWeight="Bold" Foreground="White"/>
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Background="{Binding FondoBarra}" BorderBrush="{Binding ColorBorde}" BorderThickness="0,0,0,1" Padding="10">
+            <Grid ColumnDefinitions="2.3*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                <TextBox Grid.Column="0"
+                         Text="{Binding BuscarTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Watermark="Buscar producto..."
+                         Height="34"
+                         Background="{Binding FondoPanelSecundario}"
+                         Foreground="{Binding ColorTextoPrincipal}"
+                         BorderBrush="{Binding ColorBorde}"
+                         CornerRadius="6"/>
 
-                    <TextBox Text="{Binding BuscarTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             Watermark="Buscar producto..."
-                             Height="38"
-                             FontSize="15"
-                             Background="#eaf1f7"
-                             Foreground="#2c3e50"
-                             BorderBrush="#c5d3df"
-                             CornerRadius="10"/>
+                <Button Grid.Column="1" Classes="toolButton" Content="+ Item libre" Command="{Binding AgregarItemLibreCommand}"/>
+                <Button Grid.Column="2" Classes="toolButton" Content="+ Producto JSON" Command="{Binding AgregarProductoJsonCommand}"/>
+                <Button Grid.Column="3" Classes="toolButton" Content="Menu JSON" Command="{Binding ToggleEditorMenuCommand}"/>
 
-                    <TextBlock Text="BEBIDAS" FontWeight="Bold" Foreground="#d7e3ef"/>
-                    <ItemsControl ItemsSource="{Binding BebidasFiltradas}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Classes="menuItem"
-                                        Width="150"
-                                        Command="{Binding DataContext.AgregarProductoCommand, ElementName=RootWindow}"
-                                        CommandParameter="{Binding .}"
-                                        Background="{Binding ColorFondo}"
-                                        BorderBrush="{Binding ColorBorde}">
-                                    <Grid RowDefinitions="*,Auto" Margin="2">
-                                        <TextBlock Text="{Binding Nombre}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        <Border Grid.Row="1" Background="#22ffffff" CornerRadius="8" Padding="6,2">
-                                            <TextBlock Text="{Binding Precio, StringFormat='${0:N0}'}" HorizontalAlignment="Center"/>
-                                        </Border>
-                                    </Grid>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                <ComboBox Grid.Column="4"
+                          ItemsSource="{Binding TemasDisponibles}"
+                          SelectedItem="{Binding TemaActual, Mode=TwoWay}"
+                          Width="120"
+                          Height="34"
+                          Background="{Binding FondoPanelSecundario}"
+                          Foreground="{Binding ColorTextoPrincipal}"
+                          BorderBrush="{Binding ColorBorde}"/>
+            </Grid>
+        </Border>
 
-                    <TextBlock Text="COMIDAS Y SNACKS" FontWeight="Bold" Foreground="#d7e3ef" Margin="0,6,0,0"/>
-                    <ItemsControl ItemsSource="{Binding ComidasFiltradas}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Classes="menuItem"
-                                        Width="150"
-                                        Command="{Binding DataContext.AgregarProductoCommand, ElementName=RootWindow}"
-                                        CommandParameter="{Binding .}"
-                                        Background="{Binding ColorFondo}"
-                                        BorderBrush="{Binding ColorBorde}">
-                                    <Grid RowDefinitions="*,Auto" Margin="2">
-                                        <TextBlock Text="{Binding Nombre}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        <Border Grid.Row="1" Background="#22ffffff" CornerRadius="8" Padding="6,2">
-                                            <TextBlock Text="{Binding Precio, StringFormat='${0:N0}'}" HorizontalAlignment="Center"/>
-                                        </Border>
-                                    </Grid>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
+        <Grid Grid.Row="1" ColumnDefinitions="*,360" Margin="12">
+            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                <Border Grid.Row="0" IsVisible="{Binding MostrarEditorMenu}" Background="{Binding FondoPanel}" CornerRadius="10" BorderBrush="{Binding ColorBorde}" BorderThickness="1" Padding="10">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Edicion de Menu (JSON)" FontWeight="SemiBold" Foreground="{Binding ColorTextoPrincipal}"/>
+                        <TextBlock Text="{Binding RutaMenuJson}" FontSize="11" Foreground="{Binding ColorTextoSecundario}" TextWrapping="Wrap"/>
 
-            <Border Grid.Row="1" Background="#3a4f64" CornerRadius="14" Padding="14" Margin="0,20,0,0">
-                <Grid RowDefinitions="Auto,*">
-                    <TextBlock Grid.Row="0" Text="LISTA DE ITEMS" FontWeight="Bold" Foreground="#d9e2ec" Margin="0,0,0,10"/>
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                            <Button Grid.Column="1" Classes="toolButton" Content="Formatear" Command="{Binding FormatearMenuJsonCommand}"/>
+                            <Button Grid.Column="2" Classes="toolButton" Content="Recargar" Command="{Binding RecargarMenuJsonCommand}"/>
+                            <Button Grid.Column="3" Classes="toolButton" Content="Restaurar" Command="{Binding RestaurarMenuBaseCommand}"/>
+                            <Button Grid.Column="4" Classes="toolButton" Content="Guardar" Command="{Binding GuardarMenuJsonCommand}"/>
+                        </Grid>
 
-                    <ListBox Grid.Row="1" ItemsSource="{Binding ListaFactura}" Background="Transparent" BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ColumnDefinitions="*,70,100,100,40" Margin="0,4">
-                                    <TextBox Grid.Column="0"
-                                             Text="{Binding Nombre, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             VerticalContentAlignment="Center"
-                                             Watermark="Descripcion"/>
+                        <TextBox Text="{Binding MenuJsonEditor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="170"
+                                 FontFamily="Consolas"
+                                 Background="{Binding FondoPanelSecundario}"
+                                 Foreground="{Binding ColorTextoPrincipal}"
+                                 BorderBrush="{Binding ColorBorde}"
+                                 CornerRadius="6"/>
 
-                                    <TextBox Grid.Column="1"
-                                             Text="{Binding CantidadTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             HorizontalContentAlignment="Center"
-                                             VerticalContentAlignment="Center"
-                                             Margin="8,0,0,0"
-                                             Watermark="Cant"/>
-
-                                    <TextBox Grid.Column="2"
-                                             Text="{Binding PrecioUnitarioTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             HorizontalContentAlignment="Center"
-                                             VerticalContentAlignment="Center"
-                                             Margin="8,0,0,0"
-                                             Watermark="Precio"/>
-
-                                    <TextBlock Grid.Column="3" Text="{Binding Subtotal, StringFormat='${0:N2}'}"
-                                               VerticalAlignment="Center" FontWeight="Bold" Foreground="#ffb3ab"
-                                               Margin="8,0,0,0"/>
-
-                                    <Button Grid.Column="4"
-                                            Content="X"
-                                            Command="{Binding DataContext.EliminarItemCommand, ElementName=RootWindow}"
-                                            CommandParameter="{Binding .}"
-                                            Margin="8,0,0,0"
-                                            Background="#e74c3c"
-                                            Foreground="White"
-                                            CornerRadius="6"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <Border Grid.Column="1" Background="White" CornerRadius="20,0,0,20" Margin="10,10,0,10">
-            <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="18">
-                <TextBlock Grid.Row="0" Text="DETALLE DE VENTA" FontWeight="Bold" Foreground="#95a5a6" Margin="0,0,0,10"/>
-
-                <Border Grid.Row="1" Background="#f8f9fa" CornerRadius="10" Padding="10">
-                    <StackPanel Spacing="6" VerticalAlignment="Top">
-                        <TextBlock Text="Resumen de cobro" FontWeight="SemiBold" Foreground="#7f8c8d"/>
-                        <TextBlock Text="Edita los items en la lista izquierda" FontSize="12" Foreground="#95a5a6"/>
+                        <TextBlock Text="{Binding EstadoMenuEdicion}" Foreground="{Binding ColorTextoSecundario}"/>
                     </StackPanel>
                 </Border>
 
-                <StackPanel Grid.Row="2" Spacing="10" Margin="0,20,0,0">
-                    <Separator/>
-                    <Grid ColumnDefinitions="*,*">
-                        <TextBlock Text="TOTAL:" FontSize="28" FontWeight="Black" Foreground="#2c3e50"/>
-                        <TextBlock Grid.Column="1" Text="{Binding TotalVentaActual, StringFormat='${0:N2}'}"
-                                   FontSize="28" FontWeight="Black" HorizontalAlignment="Right" Foreground="#e74c3c"/>
+                <Border Grid.Row="1" Background="{Binding FondoPanel}" CornerRadius="10" BorderBrush="{Binding ColorBorde}" BorderThickness="1" Padding="10">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="BEBIDAS" FontWeight="SemiBold" Foreground="{Binding ColorTextoSecundario}"/>
+                        <ItemsControl ItemsSource="{Binding BebidasFiltradas}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="menuItem"
+                                            Command="{Binding DataContext.AgregarProductoCommand, ElementName=RootWindow}"
+                                            CommandParameter="{Binding .}">
+                                        <Grid ColumnDefinitions="4,*,Auto" Margin="2">
+                                            <Border Grid.Column="0" Background="{Binding ColorFondo}" CornerRadius="2" Margin="0,2,6,2"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Nombre}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Precio, StringFormat='${0:N0}'}" VerticalAlignment="Center" Foreground="{Binding DataContext.ColorAcento, ElementName=RootWindow}"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="COMIDAS Y SNACKS" FontWeight="SemiBold" Foreground="{Binding ColorTextoSecundario}" Margin="0,6,0,0"/>
+                        <ItemsControl ItemsSource="{Binding ComidasFiltradas}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="menuItem"
+                                            Command="{Binding DataContext.AgregarProductoCommand, ElementName=RootWindow}"
+                                            CommandParameter="{Binding .}">
+                                        <Grid ColumnDefinitions="4,*,Auto" Margin="2">
+                                            <Border Grid.Column="0" Background="{Binding ColorFondo}" CornerRadius="2" Margin="0,2,6,2"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Nombre}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Precio, StringFormat='${0:N0}'}" VerticalAlignment="Center" Foreground="{Binding DataContext.ColorAcento, ElementName=RootWindow}"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Background="{Binding FondoPanel}" CornerRadius="10" BorderBrush="{Binding ColorBorde}" BorderThickness="1" Padding="10">
+                    <Grid RowDefinitions="Auto,*">
+                        <TextBlock Grid.Row="0" Text="LISTA DE ITEMS" FontWeight="SemiBold" Foreground="{Binding ColorTextoSecundario}" Margin="0,0,0,8"/>
+
+                        <ListBox Grid.Row="1" ItemsSource="{Binding ListaFactura}" Background="Transparent" BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,70,100,100,40" Margin="0,3">
+                                        <TextBox Grid.Column="0" Text="{Binding Nombre, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="Descripcion"
+                                                 Background="{Binding DataContext.FondoPanelSecundario, ElementName=RootWindow}"
+                                                 Foreground="{Binding DataContext.ColorTextoPrincipal, ElementName=RootWindow}"
+                                                 BorderBrush="{Binding DataContext.ColorBorde, ElementName=RootWindow}" CornerRadius="6"/>
+
+                                        <TextBox Grid.Column="1" Text="{Binding CantidadTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="8,0,0,0"
+                                                 HorizontalContentAlignment="Center" Watermark="Cant"
+                                                 Background="{Binding DataContext.FondoPanelSecundario, ElementName=RootWindow}"
+                                                 Foreground="{Binding DataContext.ColorTextoPrincipal, ElementName=RootWindow}"
+                                                 BorderBrush="{Binding DataContext.ColorBorde, ElementName=RootWindow}" CornerRadius="6"/>
+
+                                        <TextBox Grid.Column="2" Text="{Binding PrecioUnitarioTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="8,0,0,0"
+                                                 HorizontalContentAlignment="Center" Watermark="Precio"
+                                                 Background="{Binding DataContext.FondoPanelSecundario, ElementName=RootWindow}"
+                                                 Foreground="{Binding DataContext.ColorTextoPrincipal, ElementName=RootWindow}"
+                                                 BorderBrush="{Binding DataContext.ColorBorde, ElementName=RootWindow}" CornerRadius="6"/>
+
+                                        <TextBlock Grid.Column="3" Text="{Binding Subtotal, StringFormat='${0:N2}'}" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{Binding DataContext.ColorAcento, ElementName=RootWindow}"/>
+
+                                        <Button Grid.Column="4" Content="X" Margin="8,0,0,0"
+                                                Command="{Binding DataContext.EliminarItemCommand, ElementName=RootWindow}"
+                                                CommandParameter="{Binding .}"
+                                                Background="{Binding DataContext.FondoPanelSecundario, ElementName=RootWindow}"
+                                                Foreground="{Binding DataContext.ColorTextoPrincipal, ElementName=RootWindow}"
+                                                BorderBrush="{Binding DataContext.ColorBorde, ElementName=RootWindow}" CornerRadius="6"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </Grid>
-
-                    <TextBox Text="{Binding MontoRecibido}" Watermark="Efectivo recibido..." Height="45" FontSize="18"/>
-
-                    <Border Background="#f1c40f" Padding="10" CornerRadius="8">
-                        <TextBlock Text="{Binding Cambio, StringFormat='Cambio: ${0:N2}'}" HorizontalAlignment="Center" FontWeight="Bold" FontSize="20"/>
-                    </Border>
-                </StackPanel>
-
-                <Button Grid.Row="3" Content="FINALIZAR Y COBRAR" Command="{Binding FinalizarVentaCommand}"
-                        Background="#27ae60" Foreground="White" HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center" Height="50" FontWeight="Bold" Margin="0,15,0,0" CornerRadius="8"/>
+                </Border>
             </Grid>
-        </Border>
+
+            <Border Grid.Column="1" Background="{Binding FondoPanel}" CornerRadius="10" BorderBrush="{Binding ColorBorde}" BorderThickness="1" Margin="12,0,0,0">
+                <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="14">
+                    <TextBlock Grid.Row="0" Text="DETALLE DE VENTA" FontWeight="SemiBold" Foreground="{Binding ColorTextoSecundario}" Margin="0,0,0,10"/>
+
+                    <Border Grid.Row="1" Background="{Binding FondoPanelSecundario}" CornerRadius="8" BorderBrush="{Binding ColorBorde}" BorderThickness="1" Padding="10">
+                        <StackPanel Spacing="4" VerticalAlignment="Top">
+                            <TextBlock Text="Resumen" Foreground="{Binding ColorTextoPrincipal}" FontWeight="SemiBold"/>
+                            <TextBlock Text="Gestiona items y confirma cobro" FontSize="12" Foreground="{Binding ColorTextoSecundario}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Spacing="8" Margin="0,16,0,0">
+                        <Separator Background="{Binding ColorBorde}"/>
+                        <Grid ColumnDefinitions="*,*">
+                            <TextBlock Text="TOTAL:" FontSize="28" FontWeight="Bold" Foreground="{Binding ColorTextoPrincipal}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding TotalVentaActual, StringFormat='${0:N2}'}"
+                                       FontSize="28" FontWeight="Bold" HorizontalAlignment="Right" Foreground="{Binding ColorAcento}"/>
+                        </Grid>
+
+                        <TextBox Text="{Binding MontoRecibido}" Watermark="Efectivo recibido..." Height="42"
+                                 Background="{Binding FondoPanelSecundario}" Foreground="{Binding ColorTextoPrincipal}"
+                                 BorderBrush="{Binding ColorBorde}" CornerRadius="6"/>
+
+                        <Border Background="{Binding FondoPanelSecundario}" BorderBrush="{Binding ColorBorde}" BorderThickness="1" Padding="10" CornerRadius="6">
+                            <TextBlock Text="{Binding Cambio, StringFormat='Cambio: ${0:N2}'}" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{Binding ColorCambio}"/>
+                        </Border>
+                    </StackPanel>
+
+                    <Button Grid.Row="3" Content="FINALIZAR Y COBRAR" Command="{Binding FinalizarVentaCommand}"
+                            Background="{Binding ColorAcento}" BorderBrush="{Binding ColorAcentoBorde}" BorderThickness="1"
+                            Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Height="44" FontWeight="SemiBold" Margin="0,12,0,0" CornerRadius="6"/>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

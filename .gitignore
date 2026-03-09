@@ -21,6 +21,8 @@ ARM64/
 
 # Logs
 *.log
+*.tmp
+*.bak
 
 # Local tool/cache folders
 .dotnet/
