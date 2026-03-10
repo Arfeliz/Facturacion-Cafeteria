@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -24,11 +25,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private readonly string _rutaMenuJson;
 
-    // Lista editable del ticket
     public ObservableCollection<ItemVenta> ListaFactura { get; } = new();
 
-    // Catalogo base del menu (cargado desde JSON)
     public ObservableCollection<ProductoMenu> CatalogoMenu { get; } = new();
+
+    public ObservableCollection<ProductoMenu> MenuEditableLista { get; } = new();
 
     public IReadOnlyList<string> TemasDisponibles { get; } = new[] { "Azul", "Verde", "Naranja", "Gris" };
 
@@ -40,16 +41,31 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _buscarTexto = string.Empty;
 
     [ObservableProperty]
-    private string _menuJsonEditor = string.Empty;
-
-    [ObservableProperty]
     private string _estadoMenuEdicion = "Menu cargado";
 
     [ObservableProperty]
     private bool _mostrarEditorMenu;
 
     [ObservableProperty]
+    private bool _mostrarOpcionesBarra;
+
+    [ObservableProperty]
     private string _temaActual = "Azul";
+
+    [ObservableProperty]
+    private int _pestanaDerechaSeleccionada;
+
+    [ObservableProperty]
+    private string _nuevoItemNombre = string.Empty;
+
+    [ObservableProperty]
+    private string _nuevoItemPrecioTexto = "0";
+
+    [ObservableProperty]
+    private string _nuevoItemCantidadTexto = "1";
+
+    [ObservableProperty]
+    private string _estadoAgregarItem = "Completa los datos y confirma";
 
     public MainWindowViewModel()
     {
@@ -66,7 +82,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string RutaMenuJson => _rutaMenuJson;
 
-    // Paleta por tema
     public string FondoVentana => TemaActual switch
     {
         "Verde" => "#1f2824",
@@ -135,7 +150,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _ => "#78c8ff"
     };
 
-    // El total se calcula sumando los subtotales de la lista
     public decimal TotalVentaActual => ListaFactura.Sum(x => x.Subtotal);
 
     public decimal Cambio => MontoRecibido > TotalVentaActual ? MontoRecibido - TotalVentaActual : 0;
@@ -158,50 +172,95 @@ public partial class MainWindowViewModel : ViewModelBase
             PrecioUnitario = producto.Precio,
             Cantidad = 1
         });
+
+        EstadoAgregarItem = $"Agregado desde menu: {producto.Nombre}";
     }
 
     [RelayCommand]
-    private void AgregarItemLibre()
+    private void AbrirNuevoItemTab()
     {
+        if (string.IsNullOrWhiteSpace(NuevoItemNombre) && !string.IsNullOrWhiteSpace(BuscarTexto))
+        {
+            NuevoItemNombre = BuscarTexto.Trim();
+        }
+
+        PestanaDerechaSeleccionada = 1;
+    }
+
+    [RelayCommand]
+    private void AgregarItemDesdeFormulario()
+    {
+        var nombre = string.IsNullOrWhiteSpace(NuevoItemNombre) ? "Item libre" : NuevoItemNombre.Trim();
+
+        if (!TryParseDecimal(NuevoItemPrecioTexto, out var precio))
+        {
+            EstadoAgregarItem = "Precio invalido";
+            return;
+        }
+
+        if (!int.TryParse(NuevoItemCantidadTexto, out var cantidad) || cantidad <= 0)
+        {
+            EstadoAgregarItem = "Cantidad invalida";
+            return;
+        }
+
         ListaFactura.Add(new ItemVenta
         {
-            Nombre = "Item libre",
-            PrecioUnitario = 0,
-            Cantidad = 1
+            Nombre = nombre,
+            PrecioUnitario = precio < 0 ? 0 : precio,
+            Cantidad = cantidad
         });
+
+        EstadoAgregarItem = $"Agregado: {nombre}";
+        NuevoItemNombre = string.Empty;
+        NuevoItemPrecioTexto = "0";
+        NuevoItemCantidadTexto = "1";
+        PestanaDerechaSeleccionada = 0;
     }
 
     [RelayCommand]
-    private void AgregarProductoJson()
+    private void CancelarNuevoItem()
     {
-        try
-        {
-            var productos = string.IsNullOrWhiteSpace(MenuJsonEditor)
-                ? new List<ProductoMenu>()
-                : JsonSerializer.Deserialize<List<ProductoMenu>>(MenuJsonEditor, _jsonOptions) ?? new List<ProductoMenu>();
+        PestanaDerechaSeleccionada = 0;
+    }
 
-            productos.Add(new ProductoMenu
-            {
-                Nombre = "Nuevo Producto",
-                Precio = 0,
-                Categoria = "Comidas",
-                ColorFondo = "#3f6ad8",
-                ColorBorde = "#3458b3"
-            });
-
-            MenuJsonEditor = SerializarProductos(productos);
-            EstadoMenuEdicion = "Plantilla agregada al JSON (falta Guardar JSON)";
-        }
-        catch (Exception ex)
-        {
-            EstadoMenuEdicion = $"Error al agregar plantilla: {ex.Message}";
-        }
+    [RelayCommand]
+    private void ToggleOpcionesBarra()
+    {
+        MostrarOpcionesBarra = !MostrarOpcionesBarra;
     }
 
     [RelayCommand]
     private void ToggleEditorMenu()
     {
         MostrarEditorMenu = !MostrarEditorMenu;
+    }
+
+    [RelayCommand]
+    private void AgregarProductoMenuLista()
+    {
+        MenuEditableLista.Add(new ProductoMenu
+        {
+            Nombre = "Nuevo Producto",
+            Precio = 0,
+            Categoria = "Comidas",
+            ColorFondo = "#3f6ad8",
+            ColorBorde = "#3458b3"
+        });
+
+        EstadoMenuEdicion = "Nueva fila agregada al editor de menu";
+    }
+
+    [RelayCommand]
+    private void EliminarProductoMenuLista(ProductoMenu? producto)
+    {
+        if (producto is null)
+        {
+            return;
+        }
+
+        MenuEditableLista.Remove(producto);
+        EstadoMenuEdicion = "Fila eliminada";
     }
 
     [RelayCommand]
@@ -233,7 +292,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         try
         {
-            var productos = ParsearProductos(MenuJsonEditor);
+            var productos = NormalizarProductos(MenuEditableLista);
             File.WriteAllText(_rutaMenuJson, SerializarProductos(productos));
             AplicarCatalogo(productos);
             EstadoMenuEdicion = $"Guardado OK ({DateTime.Now:HH:mm:ss})";
@@ -241,21 +300,6 @@ public partial class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             EstadoMenuEdicion = $"Error al guardar: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void FormatearMenuJson()
-    {
-        try
-        {
-            var productos = ParsearProductos(MenuJsonEditor);
-            MenuJsonEditor = SerializarProductos(productos);
-            EstadoMenuEdicion = "JSON formateado";
-        }
-        catch (Exception ex)
-        {
-            EstadoMenuEdicion = $"JSON invalido: {ex.Message}";
         }
     }
 
@@ -340,9 +384,8 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             var json = File.ReadAllText(_rutaMenuJson);
-            var productos = ParsearProductos(json);
+            var productos = ParsearProductosDesdeJson(json);
             AplicarCatalogo(productos);
-            MenuJsonEditor = SerializarProductos(productos);
             EstadoMenuEdicion = $"Menu cargado ({productos.Count} productos)";
         }
         catch (Exception ex)
@@ -351,7 +394,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private List<ProductoMenu> ParsearProductos(string json)
+    private List<ProductoMenu> ParsearProductosDesdeJson(string json)
     {
         var productos = JsonSerializer.Deserialize<List<ProductoMenu>>(json, _jsonOptions);
         if (productos is null)
@@ -359,7 +402,13 @@ public partial class MainWindowViewModel : ViewModelBase
             throw new InvalidOperationException("El JSON no contiene productos.");
         }
 
+        return NormalizarProductos(productos);
+    }
+
+    private List<ProductoMenu> NormalizarProductos(IEnumerable<ProductoMenu> productos)
+    {
         var normalizados = new List<ProductoMenu>();
+
         foreach (var p in productos)
         {
             var nombre = (p.Nombre ?? string.Empty).Trim();
@@ -399,10 +448,29 @@ public partial class MainWindowViewModel : ViewModelBase
     private void AplicarCatalogo(List<ProductoMenu> productos)
     {
         CatalogoMenu.Clear();
+        MenuEditableLista.Clear();
 
         foreach (var producto in productos)
         {
-            CatalogoMenu.Add(producto);
+            var catalogoItem = new ProductoMenu
+            {
+                Nombre = producto.Nombre,
+                Precio = producto.Precio,
+                Categoria = producto.Categoria,
+                ColorFondo = producto.ColorFondo,
+                ColorBorde = producto.ColorBorde
+            };
+
+            CatalogoMenu.Add(catalogoItem);
+
+            MenuEditableLista.Add(new ProductoMenu
+            {
+                Nombre = producto.Nombre,
+                Precio = producto.Precio,
+                Categoria = producto.Categoria,
+                ColorFondo = producto.ColorFondo,
+                ColorBorde = producto.ColorBorde
+            });
         }
 
         OnPropertyChanged(nameof(BebidasFiltradas));
@@ -444,5 +512,11 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(TotalVentaActual));
         OnPropertyChanged(nameof(Cambio));
+    }
+
+    private static bool TryParseDecimal(string value, out decimal result)
+    {
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
+               decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
     }
 }

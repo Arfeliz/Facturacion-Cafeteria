@@ -1,10 +1,21 @@
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace MiniCafeteria.Models;
 
-public class ProductoMenu
+public partial class ProductoMenu : ObservableObject
 {
-    public string Nombre { get; init; } = string.Empty;
-    public decimal Precio { get; init; }
-    public string Categoria { get; init; } = string.Empty;
-    public string ColorFondo { get; init; } = "#3498db";
-    public string ColorBorde { get; init; } = "#2c7bb5";
+    [ObservableProperty]
+    private string _nombre = string.Empty;
+
+    [ObservableProperty]
+    private decimal _precio;
+
+    [ObservableProperty]
+    private string _categoria = string.Empty;
+
+    [ObservableProperty]
+    private string _colorFondo = "#3498db";
+
+    [ObservableProperty]
+    private string _colorBorde = "#2c7bb5";
 }
