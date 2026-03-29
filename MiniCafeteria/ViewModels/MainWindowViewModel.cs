@@ -1,6 +1,7 @@
 ﻿using Avalonia.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -17,13 +18,16 @@ namespace MiniCafeteria.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    private readonly JsonSerializerOptions _jsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
 
     private readonly string _rutaMenuJson;
+    private readonly string _rutaVentasJson;
+    private readonly string _rutaNegocioJson;
+    private int _ultimoVentaId;
 
     public ObservableCollection<ItemVenta> ListaFactura { get; } = new();
 
@@ -31,10 +35,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<ProductoMenu> MenuEditableLista { get; } = new();
 
+    public ObservableCollection<Venta> HistorialVentasDia { get; } = new();
+
     public IReadOnlyList<string> TemasDisponibles { get; } = new[] { "Azul", "Verde", "Naranja", "Gris" };
 
+    public IReadOnlyList<string> MetodosPagoDisponibles { get; } = new[] { "Efectivo", "Tarjeta" };
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Cambio))]
     private decimal _montoRecibido;
 
     [ObservableProperty]
@@ -42,6 +49,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _estadoMenuEdicion = "Menu cargado";
+
+    [ObservableProperty]
+    private string _estadoCobro = "Agrega productos para comenzar una venta";
 
     [ObservableProperty]
     private bool _mostrarEditorMenu;
@@ -67,20 +77,57 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _estadoAgregarItem = "Completa los datos y confirma";
 
+    [ObservableProperty]
+    private string _metodoPagoSeleccionado = "Efectivo";
+
+    [ObservableProperty]
+    private bool _confirmandoCobro;
+
+    [ObservableProperty]
+    private bool _mostrarEditorNegocio;
+
+    [ObservableProperty]
+    private string _estadoNegocio = string.Empty;
+
+    [ObservableProperty]
+    private string _nombreNegocio = "Mi Cafeteria";
+
+    [ObservableProperty]
+    private string _esloganNegocio = string.Empty;
+
+    [ObservableProperty]
+    private string _direccionNegocio = string.Empty;
+
+    [ObservableProperty]
+    private string _telefonoNegocio = string.Empty;
+
+    [ObservableProperty]
+    private string _emailNegocio = string.Empty;
+
+    [ObservableProperty]
+    private string _rifNegocio = string.Empty;
+
+    [ObservableProperty]
+    private string _piePaginaNegocio = "¡Gracias por su visita!";
+
     public MainWindowViewModel()
     {
-        _rutaMenuJson = Path.Combine(
+        var directorioDatos = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MiniCafeteria",
-            "menu-productos.json");
+            "MiniCafeteria");
+
+        _rutaMenuJson = Path.Combine(directorioDatos, "menu-productos.json");
+        _rutaVentasJson = Path.Combine(directorioDatos, "ventas.json");
+        _rutaNegocioJson = Path.Combine(directorioDatos, "negocio.json");
 
         ListaFactura.CollectionChanged += OnListaFacturaCollectionChanged;
 
-        AsegurarArchivoMenuEditable();
+        AsegurarArchivosDatos();
         RecargarMenuDesdeArchivoInterno();
+        CargarHistorialVentas();
+        CargarDatosNegocio();
+        ActualizarEstadoCobro();
     }
-
-    public string RutaMenuJson => _rutaMenuJson;
 
     public string FondoVentana => TemaActual switch
     {
@@ -152,11 +199,29 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public decimal TotalVentaActual => ListaFactura.Sum(x => x.Subtotal);
 
-    public decimal Cambio => MontoRecibido > TotalVentaActual ? MontoRecibido - TotalVentaActual : 0;
+    public decimal Cambio =>
+        RequiereMontoRecibido && MontoRecibido > TotalVentaActual
+            ? MontoRecibido - TotalVentaActual
+            : 0;
 
-    public IEnumerable<ProductoMenu> BebidasFiltradas => FiltrarPorCategoria("Bebidas");
+    public bool RequiereMontoRecibido => MetodoPagoSeleccionado == "Efectivo";
 
-    public IEnumerable<ProductoMenu> ComidasFiltradas => FiltrarPorCategoria("Comidas");
+    public bool MostrarAvisoTarjeta => !RequiereMontoRecibido;
+
+    public string TextoBotonFinalizar => ConfirmandoCobro ? "CONFIRMAR COBRO" : "FINALIZAR Y COBRAR";
+
+    public int CantidadVentasHoy => HistorialVentasDia.Count;
+
+    public decimal TotalVentasHoy => HistorialVentasDia.Sum(x => x.Total);
+
+    public IEnumerable<CategoriaCatalogoGrupo> CategoriasCatalogo =>
+        FiltrarCatalogo()
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.Categoria) ? "Sin categoria" : p.Categoria.Trim())
+            .Select(g => new CategoriaCatalogoGrupo
+            {
+                Nombre = g.Key.ToUpperInvariant(),
+                Productos = g.ToList()
+            });
 
     [RelayCommand]
     private void AgregarProducto(ProductoMenu? producto)
@@ -166,13 +231,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        ListaFactura.Add(new ItemVenta
-        {
-            Nombre = producto.Nombre,
-            PrecioUnitario = producto.Precio,
-            Cantidad = 1
-        });
-
+        AgregarOIncrementarItem(producto.Nombre, producto.Precio, 1);
         EstadoAgregarItem = $"Agregado desde menu: {producto.Nombre}";
     }
 
@@ -198,19 +257,13 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (!int.TryParse(NuevoItemCantidadTexto, out var cantidad) || cantidad <= 0)
+        if (!int.TryParse(NuevoItemCantidadTexto, NumberStyles.Integer, CultureInfo.CurrentCulture, out var cantidad) || cantidad <= 0)
         {
             EstadoAgregarItem = "Cantidad invalida";
             return;
         }
 
-        ListaFactura.Add(new ItemVenta
-        {
-            Nombre = nombre,
-            PrecioUnitario = precio < 0 ? 0 : precio,
-            Cantidad = cantidad
-        });
-
+        AgregarOIncrementarItem(nombre, precio < 0 ? 0 : precio, cantidad);
         EstadoAgregarItem = $"Agregado: {nombre}";
         NuevoItemNombre = string.Empty;
         NuevoItemPrecioTexto = "0";
@@ -275,16 +328,45 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void CancelarConfirmacionCobro()
+    {
+        ConfirmandoCobro = false;
+        ActualizarEstadoCobro();
+    }
+
+    [RelayCommand]
     private void FinalizarVenta()
     {
-        foreach (var item in ListaFactura)
+        if (ListaFactura.Count == 0)
         {
-            item.PropertyChanged -= OnItemVentaPropertyChanged;
+            EstadoCobro = "No hay items en la venta actual";
+            ConfirmandoCobro = false;
+            return;
         }
 
-        ListaFactura.Clear();
-        MontoRecibido = 0;
-        NotificarTotales();
+        if (RequiereMontoRecibido && MontoRecibido < TotalVentaActual)
+        {
+            EstadoCobro = "El monto recibido no puede ser menor al total para ventas en efectivo";
+            ConfirmandoCobro = false;
+            return;
+        }
+
+        if (!ConfirmandoCobro)
+        {
+            ConfirmandoCobro = true;
+            EstadoCobro = $"Confirma el cobro por {TotalVentaActual:C2} con {MetodoPagoSeleccionado.ToLowerInvariant()}";
+            OnPropertyChanged(nameof(TextoBotonFinalizar));
+            return;
+        }
+
+        var totalCobrado = TotalVentaActual;
+        var htmlFactura = GenerarHtmlFactura();
+        RegistrarVentaActual();
+        LimpiarVentaActual();
+        ConfirmandoCobro = false;
+        EstadoCobro = $"Venta guardada. Total cobrado: {totalCobrado:C2}";
+        OnPropertyChanged(nameof(TextoBotonFinalizar));
+        AbrirHtmlFactura(htmlFactura);
     }
 
     [RelayCommand]
@@ -325,6 +407,63 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    [RelayCommand]
+    private void ToggleEditorNegocio()
+    {
+        MostrarEditorNegocio = !MostrarEditorNegocio;
+    }
+
+    [RelayCommand]
+    private void GuardarDatosNegocio()
+    {
+        try
+        {
+            var datos = new DatosNegocio
+            {
+                NombreNegocio = NombreNegocio.Trim(),
+                Eslogan = EsloganNegocio.Trim(),
+                Direccion = DireccionNegocio.Trim(),
+                Telefono = TelefonoNegocio.Trim(),
+                Email = EmailNegocio.Trim(),
+                Rif = RifNegocio.Trim(),
+                PiePagina = PiePaginaNegocio.Trim()
+            };
+
+            File.WriteAllText(_rutaNegocioJson, JsonSerializer.Serialize(datos, JsonOptions), Encoding.UTF8);
+            EstadoNegocio = $"Guardado ({DateTime.Now:HH:mm:ss})";
+        }
+        catch (Exception ex)
+        {
+            EstadoNegocio = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ImprimirFactura()
+    {
+        if (ListaFactura.Count == 0)
+        {
+            EstadoCobro = "No hay items para imprimir";
+            return;
+        }
+
+        AbrirHtmlFactura(GenerarHtmlFactura());
+    }
+
+    private void AbrirHtmlFactura(string html)
+    {
+        try
+        {
+            var archivo = Path.Combine(Path.GetTempPath(), $"factura_{DateTime.Now:yyyyMMdd_HHmmss}.html");
+            File.WriteAllText(archivo, html, Encoding.UTF8);
+            Process.Start(new ProcessStartInfo(archivo) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            EstadoCobro = $"Error al generar factura: {ex.Message}";
+        }
+    }
+
     partial void OnTemaActualChanged(string value)
     {
         OnPropertyChanged(nameof(FondoVentana));
@@ -332,8 +471,6 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(FondoPanel));
         OnPropertyChanged(nameof(FondoPanelSecundario));
         OnPropertyChanged(nameof(ColorBorde));
-        OnPropertyChanged(nameof(ColorTextoPrincipal));
-        OnPropertyChanged(nameof(ColorTextoSecundario));
         OnPropertyChanged(nameof(ColorAcento));
         OnPropertyChanged(nameof(ColorAcentoBorde));
         OnPropertyChanged(nameof(ColorCambio));
@@ -341,23 +478,36 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnBuscarTextoChanged(string value)
     {
-        OnPropertyChanged(nameof(BebidasFiltradas));
-        OnPropertyChanged(nameof(ComidasFiltradas));
+        OnPropertyChanged(nameof(CategoriasCatalogo));
     }
 
-    private IEnumerable<ProductoMenu> FiltrarPorCategoria(string categoria)
+    partial void OnMontoRecibidoChanged(decimal value)
     {
-        var query = CatalogoMenu.Where(p => p.Categoria == categoria);
+        InvalidarConfirmacionCobro();
+        OnPropertyChanged(nameof(Cambio));
+        ActualizarEstadoCobro();
+    }
 
+    partial void OnMetodoPagoSeleccionadoChanged(string value)
+    {
+        InvalidarConfirmacionCobro();
+        OnPropertyChanged(nameof(RequiereMontoRecibido));
+        OnPropertyChanged(nameof(MostrarAvisoTarjeta));
+        OnPropertyChanged(nameof(Cambio));
+        ActualizarEstadoCobro();
+    }
+
+    private IEnumerable<ProductoMenu> FiltrarCatalogo()
+    {
         if (string.IsNullOrWhiteSpace(BuscarTexto))
         {
-            return query;
+            return CatalogoMenu;
         }
 
-        return query.Where(p => p.Nombre.Contains(BuscarTexto, StringComparison.OrdinalIgnoreCase));
+        return CatalogoMenu.Where(p => p.Nombre.Contains(BuscarTexto, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void AsegurarArchivoMenuEditable()
+    private void AsegurarArchivosDatos()
     {
         var directorio = Path.GetDirectoryName(_rutaMenuJson);
         if (!string.IsNullOrWhiteSpace(directorio))
@@ -368,6 +518,41 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!File.Exists(_rutaMenuJson))
         {
             File.WriteAllText(_rutaMenuJson, LeerMenuBaseEmbebido());
+        }
+
+        if (!File.Exists(_rutaVentasJson))
+        {
+            File.WriteAllText(_rutaVentasJson, "[]");
+        }
+    }
+
+    private void CargarDatosNegocio()
+    {
+        try
+        {
+            if (!File.Exists(_rutaNegocioJson))
+            {
+                return;
+            }
+
+            var json = File.ReadAllText(_rutaNegocioJson);
+            var datos = JsonSerializer.Deserialize<DatosNegocio>(json, JsonOptions);
+            if (datos is null)
+            {
+                return;
+            }
+
+            NombreNegocio = datos.NombreNegocio;
+            EsloganNegocio = datos.Eslogan;
+            DireccionNegocio = datos.Direccion;
+            TelefonoNegocio = datos.Telefono;
+            EmailNegocio = datos.Email;
+            RifNegocio = datos.Rif;
+            PiePaginaNegocio = datos.PiePagina;
+        }
+        catch
+        {
+            // Usar valores por defecto si el archivo está corrupto
         }
     }
 
@@ -394,14 +579,34 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void CargarHistorialVentas()
+    {
+        try
+        {
+            var ventas = LeerVentasDesdeArchivo();
+            _ultimoVentaId = ventas.Count == 0 ? 0 : ventas.Max(v => v.Id);
+
+            HistorialVentasDia.Clear();
+            foreach (var venta in ventas.Where(v => v.Fecha.Date == DateTime.Today))
+            {
+                HistorialVentasDia.Add(venta);
+            }
+
+            OnPropertyChanged(nameof(CantidadVentasHoy));
+            OnPropertyChanged(nameof(TotalVentasHoy));
+        }
+        catch
+        {
+            HistorialVentasDia.Clear();
+            _ultimoVentaId = 0;
+            OnPropertyChanged(nameof(CantidadVentasHoy));
+            OnPropertyChanged(nameof(TotalVentasHoy));
+        }
+    }
+
     private List<ProductoMenu> ParsearProductosDesdeJson(string json)
     {
-        var productos = JsonSerializer.Deserialize<List<ProductoMenu>>(json, _jsonOptions);
-        if (productos is null)
-        {
-            throw new InvalidOperationException("El JSON no contiene productos.");
-        }
-
+        var productos = JsonSerializer.Deserialize<List<ProductoMenu>>(json, JsonOptions) ?? [];
         return NormalizarProductos(productos);
     }
 
@@ -417,7 +622,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            var categoria = string.IsNullOrWhiteSpace(p.Categoria) ? "Comidas" : p.Categoria.Trim();
+            var categoria = string.IsNullOrWhiteSpace(p.Categoria) ? "Sin categoria" : p.Categoria.Trim();
             var colorFondo = string.IsNullOrWhiteSpace(p.ColorFondo) ? "#3498db" : p.ColorFondo.Trim();
             var colorBorde = string.IsNullOrWhiteSpace(p.ColorBorde) ? "#2c7bb5" : p.ColorBorde.Trim();
             var precio = p.Precio < 0 ? 0 : p.Precio;
@@ -432,17 +637,12 @@ public partial class MainWindowViewModel : ViewModelBase
             });
         }
 
-        if (normalizados.Count == 0)
-        {
-            throw new InvalidOperationException("No hay productos validos para mostrar.");
-        }
-
         return normalizados;
     }
 
     private string SerializarProductos(List<ProductoMenu> productos)
     {
-        return JsonSerializer.Serialize(productos, _jsonOptions);
+        return JsonSerializer.Serialize(productos, JsonOptions);
     }
 
     private void AplicarCatalogo(List<ProductoMenu> productos)
@@ -473,8 +673,90 @@ public partial class MainWindowViewModel : ViewModelBase
             });
         }
 
-        OnPropertyChanged(nameof(BebidasFiltradas));
-        OnPropertyChanged(nameof(ComidasFiltradas));
+        OnPropertyChanged(nameof(CategoriasCatalogo));
+    }
+
+    private void AgregarOIncrementarItem(string nombre, decimal precioUnitario, int cantidad)
+    {
+        var existente = ListaFactura.FirstOrDefault(item =>
+            string.Equals(item.Nombre, nombre, StringComparison.OrdinalIgnoreCase) &&
+            item.PrecioUnitario == precioUnitario);
+
+        if (existente is not null)
+        {
+            existente.Cantidad += cantidad;
+            return;
+        }
+
+        ListaFactura.Add(new ItemVenta
+        {
+            Nombre = nombre,
+            PrecioUnitario = precioUnitario,
+            Cantidad = cantidad
+        });
+    }
+
+    private void RegistrarVentaActual()
+    {
+        var totalCobrado = TotalVentaActual;
+        var montoRecibido = RequiereMontoRecibido ? MontoRecibido : totalCobrado;
+        var venta = new Venta
+        {
+            Id = ++_ultimoVentaId,
+            Fecha = DateTime.Now,
+            Total = totalCobrado,
+            MontoRecibido = montoRecibido,
+            Cambio = RequiereMontoRecibido ? Cambio : 0,
+            MetodoPago = MetodoPagoSeleccionado,
+            Detalles = ListaFactura.Select(item => new DetalleVenta
+            {
+                Nombre = item.Nombre,
+                PrecioUnitario = item.PrecioUnitario,
+                Cantidad = item.Cantidad
+            }).ToList()
+        };
+
+        var ventas = LeerVentasDesdeArchivo();
+        ventas.Add(venta);
+        File.WriteAllText(_rutaVentasJson, JsonSerializer.Serialize(ventas, JsonOptions));
+
+        if (venta.Fecha.Date == DateTime.Today)
+        {
+            HistorialVentasDia.Add(venta);
+            OnPropertyChanged(nameof(CantidadVentasHoy));
+            OnPropertyChanged(nameof(TotalVentasHoy));
+        }
+    }
+
+    private List<Venta> LeerVentasDesdeArchivo()
+    {
+        if (!File.Exists(_rutaVentasJson))
+        {
+            return [];
+        }
+
+        var json = File.ReadAllText(_rutaVentasJson);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        return JsonSerializer.Deserialize<List<Venta>>(json, JsonOptions) ?? [];
+    }
+
+    private void LimpiarVentaActual()
+    {
+        foreach (var item in ListaFactura)
+        {
+            item.PropertyChanged -= OnItemVentaPropertyChanged;
+        }
+
+        ListaFactura.Clear();
+        MontoRecibido = 0;
+        MetodoPagoSeleccionado = "Efectivo";
+        ConfirmandoCobro = false;
+        OnPropertyChanged(nameof(TextoBotonFinalizar));
+        ActualizarEstadoCobro();
     }
 
     private void OnListaFacturaCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -495,16 +777,21 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
+        InvalidarConfirmacionCobro();
         NotificarTotales();
+        ActualizarEstadoCobro();
     }
 
     private void OnItemVentaPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ItemVenta.Cantidad) ||
             e.PropertyName == nameof(ItemVenta.PrecioUnitario) ||
-            e.PropertyName == nameof(ItemVenta.Subtotal))
+            e.PropertyName == nameof(ItemVenta.Subtotal) ||
+            e.PropertyName == nameof(ItemVenta.Nombre))
         {
+            InvalidarConfirmacionCobro();
             NotificarTotales();
+            ActualizarEstadoCobro();
         }
     }
 
@@ -514,9 +801,129 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(Cambio));
     }
 
+    private void InvalidarConfirmacionCobro()
+    {
+        if (!ConfirmandoCobro)
+        {
+            return;
+        }
+
+        ConfirmandoCobro = false;
+        OnPropertyChanged(nameof(TextoBotonFinalizar));
+    }
+
+    private void ActualizarEstadoCobro()
+    {
+        if (ListaFactura.Count == 0)
+        {
+            EstadoCobro = "Agrega productos para comenzar una venta";
+            return;
+        }
+
+        if (RequiereMontoRecibido && MontoRecibido < TotalVentaActual)
+        {
+            EstadoCobro = $"Faltan {(TotalVentaActual - MontoRecibido):C2} para completar el cobro en efectivo";
+            return;
+        }
+
+        EstadoCobro = RequiereMontoRecibido
+            ? $"Cobro listo. Cambio estimado: {Cambio:C2}"
+            : "Cobro listo para tarjeta";
+    }
+
     private static bool TryParseDecimal(string value, out decimal result)
     {
         return decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
                decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+    }
+
+    private string GenerarHtmlFactura()
+    {
+        var sb = new StringBuilder();
+        var ahora = DateTime.Now;
+
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html lang='es'><head><meta charset='utf-8'/>");
+        sb.AppendLine("<title>Factura</title>");
+        sb.AppendLine("<style>");
+        sb.AppendLine("* { box-sizing: border-box; margin: 0; padding: 0; }");
+        sb.AppendLine("body { font-family: 'Courier New', Courier, monospace; width: 80mm; margin: 0 auto; padding: 8mm; font-size: 12px; }");
+        sb.AppendLine(".center { text-align: center; }");
+        sb.AppendLine(".negocio { font-size: 16px; font-weight: bold; margin-bottom: 2px; }");
+        sb.AppendLine(".eslogan { font-size: 11px; color: #555; margin-bottom: 4px; }");
+        sb.AppendLine(".info { font-size: 11px; margin-bottom: 2px; }");
+        sb.AppendLine(".sep-dash { border: none; border-top: 1px dashed #000; margin: 6px 0; }");
+        sb.AppendLine(".sep-solid { border: none; border-top: 2px solid #000; margin: 6px 0; }");
+        sb.AppendLine("table { width: 100%; border-collapse: collapse; margin: 4px 0; }");
+        sb.AppendLine("th { border-bottom: 1px solid #000; text-align: left; padding: 2px 0; font-size: 11px; }");
+        sb.AppendLine("td { padding: 2px 0; vertical-align: top; }");
+        sb.AppendLine(".right { text-align: right; }");
+        sb.AppendLine(".item-nombre { width: 40%; }");
+        sb.AppendLine(".total-bloque { margin-top: 4px; }");
+        sb.AppendLine(".total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin: 4px 0; }");
+        sb.AppendLine(".subtotal-row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }");
+        sb.AppendLine(".footer { margin-top: 10px; font-size: 11px; color: #444; }");
+        sb.AppendLine("@media print { @page { margin: 0; size: 80mm auto; } body { padding: 5mm; } }");
+        sb.AppendLine("</style></head><body>");
+
+        // Encabezado
+        sb.AppendLine("<div class='center'>");
+        sb.AppendLine($"<div class='negocio'>{EscaparHtml(NombreNegocio)}</div>");
+        if (!string.IsNullOrWhiteSpace(EsloganNegocio))
+            sb.AppendLine($"<div class='eslogan'>{EscaparHtml(EsloganNegocio)}</div>");
+        if (!string.IsNullOrWhiteSpace(RifNegocio))
+            sb.AppendLine($"<div class='info'>RIF: {EscaparHtml(RifNegocio)}</div>");
+        if (!string.IsNullOrWhiteSpace(DireccionNegocio))
+            sb.AppendLine($"<div class='info'>{EscaparHtml(DireccionNegocio)}</div>");
+        if (!string.IsNullOrWhiteSpace(TelefonoNegocio))
+            sb.AppendLine($"<div class='info'>Tel: {EscaparHtml(TelefonoNegocio)}</div>");
+        if (!string.IsNullOrWhiteSpace(EmailNegocio))
+            sb.AppendLine($"<div class='info'>{EscaparHtml(EmailNegocio)}</div>");
+        sb.AppendLine("</div>");
+
+        sb.AppendLine("<hr class='sep-solid'/>");
+        sb.AppendLine($"<div>Fecha: {ahora:dd/MM/yyyy HH:mm}</div>");
+        sb.AppendLine($"<div>Metodo de pago: {EscaparHtml(MetodoPagoSeleccionado)}</div>");
+        sb.AppendLine("<hr class='sep-dash'/>");
+
+        // Items
+        sb.AppendLine("<table>");
+        sb.AppendLine("<tr><th class='item-nombre'>Descripcion</th><th class='right'>Cant</th><th class='right'>P.Unit</th><th class='right'>Subtotal</th></tr>");
+        foreach (var item in ListaFactura)
+        {
+            sb.AppendLine($"<tr><td class='item-nombre'>{EscaparHtml(item.Nombre)}</td><td class='right'>{item.Cantidad}</td><td class='right'>{item.PrecioUnitario:N2}</td><td class='right'>{item.Subtotal:N2}</td></tr>");
+        }
+        sb.AppendLine("</table>");
+
+        sb.AppendLine("<hr class='sep-solid'/>");
+
+        // Totales
+        sb.AppendLine("<div class='total-bloque'>");
+        sb.AppendLine($"<div class='total-row'><span>TOTAL:</span><span>{TotalVentaActual:N2}</span></div>");
+        if (RequiereMontoRecibido)
+        {
+            sb.AppendLine($"<div class='subtotal-row'><span>Efectivo recibido:</span><span>{MontoRecibido:N2}</span></div>");
+            sb.AppendLine($"<div class='subtotal-row'><span>Cambio:</span><span>{Cambio:N2}</span></div>");
+        }
+        sb.AppendLine("</div>");
+
+        // Pie
+        if (!string.IsNullOrWhiteSpace(PiePaginaNegocio))
+        {
+            sb.AppendLine("<hr class='sep-dash'/>");
+            sb.AppendLine($"<div class='center footer'>{EscaparHtml(PiePaginaNegocio)}</div>");
+        }
+
+        sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
+
+    private static string EscaparHtml(string texto)
+    {
+        return texto
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("\"", "&quot;");
     }
 }
